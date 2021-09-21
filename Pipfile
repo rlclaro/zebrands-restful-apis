@@ -1,0 +1,23 @@
+[[source]]
+
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+
+[packages]
+
+flask = "*"
+marshmallow = "*"
+pytest = "*"
+requests = "*"
+PyJWT= "1.6.4"
+Flask-Mail = '*'
+
+[dev-packages]
+
+
+
+[requires]
+
+python_version = "3.8"
