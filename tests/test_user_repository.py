@@ -3,7 +3,7 @@
 import uuid
 import datetime
 
-from user_repository import create_table, add_user, get_all_user, delete_user, get_user_by_id
+from repository.user_db import create_table, add_user, get_all_user, delete_user, get_user_by_id
 from catalog.model.user import User
 from werkzeug.security import generate_password_hash
 

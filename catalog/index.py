@@ -14,12 +14,15 @@ from flask_apispec.extension import FlaskApiSpec
 from flask_mail import Mail, Message
 from flask_restful import Api
 from marshmallow import fields
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
 from werkzeug.security import check_password_hash, generate_password_hash
 
-import product_repository
-import user_repository
-from model.product import ProductSchema, Product, EmptySchema
-from model.user import UserSchema, User
+from model.product import ProductSchema, Product, EmptySchema, AddProductSchema
+from model.user import UserSchema, User, AddUserSchema
+from repository.mappings import start_mappers
+from repository.product_repository import ProductRepository
+from repository.user_repository import UserRepository
 
 app = Flask(__name__)  # Flask app instance initiated
 api = Api(app)  # Flask restful wraps Flask app around it.
@@ -36,6 +39,10 @@ app.config.update({
     'APISPEC_SWAGGER_UI_URL': '/swagger-ui/'  # URI to access UI of API Doc
 })
 docs = FlaskApiSpec(app)
+
+start_mappers()
+engine = create_engine("sqlite:///catalog.db", connect_args={'check_same_thread': False})
+Session = sessionmaker(bind=engine)
 
 
 def token_required(f):
@@ -55,7 +62,9 @@ def token_required(f):
             # print("Token: {}".format(token))
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
             # print("Id User {}".format(data['public_id']))
-            current_user = user_repository.get_user_by_id(data['public_id'])
+            session = Session()
+            repository = UserRepository(session)
+            current_user = repository.get_by_id(data['public_id'])
             print(current_user)
         except Exception as e:
             print("Error in decorator {}".format(e.__str__()))
@@ -88,8 +97,10 @@ def get_product():
      Get all products
     :return: json all products
     """
+    session = Session()
+    repository = ProductRepository(session)
+    products = repository.get_all()
     schema = ProductSchema(many=True)
-    products = product_repository.get_all_product()
     print("Count all products {}".format(products.__len__()))
     all_product = schema.dump(products)
     return jsonify(all_product)
@@ -97,19 +108,22 @@ def get_product():
 @app.route('/products', methods=['POST'])
 @token_required
 @doc(description='POST Product API.', tags=['Product'])
-#@use_kwargs(ProductSchema, location=('json'))
+@use_kwargs(AddProductSchema, location=('json'))
 @marshal_with(EmptySchema, code=200)
-def post_product(current_user):
+def post_product(current_user,  **kwargs):
     """
      Add new product
     :param current_user: current user from jwt
     :return: api result
     """
     if current_user is not None and current_user.role == 'Admin':
-        product = ProductSchema().load(request.get_json())
-        new_product = Product(product['sku'], product['name'], product['price'], product['brand'],
-                              product['created'])
-        result = product_repository.add_product(new_product)
+        # print(request.get_json())
+        product = AddProductSchema().load(request.get_json())
+        new_product = Product(str(uuid.uuid4()), product['name'], product['price'], product['brand'],
+                              datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'))
+        session = Session()
+        repository = ProductRepository(session)
+        result = repository.add(new_product)
         if result:
             return "Product add OK", 200
         else:
@@ -121,9 +135,9 @@ def post_product(current_user):
 @app.route("/products", methods=["PUT"])
 @token_required
 @doc(description='PUT Product API.', tags=['Product'])
-#@use_kwargs(ProductSchema, location=('json'))
+@use_kwargs(ProductSchema, location=('json'))
 @marshal_with(EmptySchema, code=200)
-def put_product(current_user):
+def put_product(current_user, **kwargs):
     """
     Update product
     :param current_user: current user from jwt
@@ -133,11 +147,15 @@ def put_product(current_user):
         product = ProductSchema().load(request.get_json())
         update_product = Product(product['sku'], product['name'], product['price'], product['brand'],
                                  product['created'])
-        result = product_repository.update_product(update_product)
+        session = Session()
+        repository = ProductRepository(session)
+        result = repository.update(update_product)
         if result:
             print("Update product {}".format(result))
             # send email to others Admin
-            users = user_repository.get_all_user()
+            session = Session()
+            repository_user = UserRepository(session)
+            users = repository_user.get_all()
             with mail.connect() as conn:
                 # print("Count user {}".format(users.__len__()))
                 for user in users:
@@ -173,7 +191,9 @@ def delete_product(current_user, sku):
     """
     if current_user is not None and current_user.role == 'Admin':
         print("Sku delete {}".format(sku))
-        result = product_repository.delete_product(sku)
+        session = Session()
+        repository = ProductRepository(session)
+        result = repository.delete(sku)
         if result:
             return "Product delete OK", 200
         else:
@@ -193,7 +213,9 @@ def get_user(current_user):
     """
     if current_user is not None and current_user.role == 'Admin':
         schema = UserSchema(many=True)
-        users = user_repository.get_all_user()
+        session = Session()
+        repository = UserRepository(session)
+        users = repository.get_all()
         print("Count all users {}".format(users.__len__()))
         all_user = schema.dump(users)
         return jsonify(all_user)
@@ -202,23 +224,25 @@ def get_user(current_user):
 @app.route('/user', methods=['POST'])
 @token_required
 @doc(description='POST User API.', tags=['User'])
-#@use_kwargs(UserSchema, location=('json'))
+@use_kwargs(AddUserSchema, location=('json'))
 @marshal_with(EmptySchema, code=200)
-def post_user(current_user):
+def post_user(current_user, **kwargs):
     """
     Add new user
     :param current_user: current user from jwt
     :return: api result
     """
     if current_user is not None and current_user.role == 'Admin':
-        user = UserSchema().load(request.get_json())
+        user = AddUserSchema().load(request.get_json())
         password = generate_password_hash(user['password'], method='sha256')
         new_user = User(str(uuid.uuid4()), user['name'], user['email'], password, user['role'],
                         datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'), current_user.id)
-        users_db = user_repository.get_all_user()
+        session = Session()
+        repository = UserRepository(session)
+        users_db = repository.get_all()
         exists_admin_api = next((s for s in users_db if s.email == new_user.email), None)
         if exists_admin_api is None:
-            result = user_repository.add_user(new_user)
+            result = repository.add(new_user)
             if result:
                 return "User add OK", 200
         return "Error add new user", 400
@@ -228,9 +252,9 @@ def post_user(current_user):
 @app.route("/user", methods=["PUT"])
 @token_required
 @doc(description='PUT User API.', tags=['User'])
-#@use_kwargs(UserSchema, location=('json'))
+@use_kwargs(UserSchema, location=('json'))
 @marshal_with(EmptySchema, code=200)
-def put_user(current_user):
+def put_user(current_user, **kwargs):
     """
      Update user
     :param current_user: current user from jwt
@@ -240,7 +264,9 @@ def put_user(current_user):
         user = UserSchema().load(request.get_json())
         update_user = User(user['id'], user['name'], user['email'], user['password'], user['role'],
                            user['created'], user['idcreated'])
-        result = user_repository.update_user(update_user)
+        session = Session()
+        repository = UserRepository(session)
+        result = repository.update(update_user)
         if result:
             return "Product update OK", 200
         else:
@@ -262,7 +288,9 @@ def delete_user(current_user, id):
     """
     if current_user is not None and current_user.role == 'Admin':
         print("Id delete {}".format(id))
-        result = user_repository.delete_user(id)
+        session = Session()
+        repository = UserRepository(session)
+        result = repository.delete(id)
         if result:
             return "Product delete OK", 200
         else:
@@ -282,7 +310,9 @@ def login_user():
     auth = request.authorization
     if not auth or not auth.username or not auth.password:
         return make_response('could not verify', 401, {'WWW.Authentication': 'Basic realm: "login required"'})
-    users_db = user_repository.get_all_user()
+    session = Session()
+    repository = UserRepository(session)
+    users_db = repository.get_all()
     user = next((s for s in users_db if s.email == auth.username), None)
     if user is not None and check_password_hash(user.password, auth.password):
         token = jwt.encode(

@@ -3,10 +3,11 @@
 from model.product import Product
 
 
-class UserRepository(object):
+class ProductRepository(object):
     """
-    User repository
+    Product repository
     """
+
     def __init__(self, session):
         self.session = session
 
@@ -14,11 +15,11 @@ class UserRepository(object):
         """
          Add new entity
         :param entity: Product
-        :return:
+        :return: True
         """
         self.session.add(entity)
         self.session.commit()
-        return entity
+        return True
 
     def get_by_sku(self, sku):
         """
@@ -41,9 +42,15 @@ class UserRepository(object):
         :param entity: Product entity to update
         :return: True or False
         """
-        self.session.add(entity)
-        self.session.commit()
-        return True
+        try:
+            # print("Sku: {}".format(entity.sku))
+            self.session.query(Product).filter_by(sku=entity.sku).update(
+                {'name': entity.name, 'price': entity.price, "brand": entity.brand})
+            self.session.commit()
+            return True
+        except:
+            self.session.rollback()
+            raise
 
     def delete(self, sku):
         """
@@ -51,7 +58,11 @@ class UserRepository(object):
         :param sku: product sku
         :return: True or False
         """
-        entity = self.session.query(Product).filter_by(sku=sku).one()
-        self.session.delete(entity)
-        self.session.commit()
-        return True
+        try:
+            entity = self.session.query(Product).filter_by(sku=sku).one()
+            self.session.delete(entity)
+            self.session.commit()
+            return True
+        except:
+            self.session.rollback()
+            raise
