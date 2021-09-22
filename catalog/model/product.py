@@ -51,8 +51,12 @@ class ProductSchema(Schema):
     """
     Product Schema
     """
-    sku = fields.String()
-    name = fields.String()
-    price = fields.Number()
-    brand = fields.String()
-    created = fields.String()
+    sku = fields.String(required=False, description="product sku")
+    name = fields.String(required=True, description="product name")
+    price = fields.Integer(required=True, description="product price")
+    brand = fields.String(required=True, description="product brand")
+    created = fields.String(required=True, description="product created")
+
+
+class EmptySchema(Schema):
+    pass

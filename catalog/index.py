@@ -1,23 +1,41 @@
 # -*- coding: utf-8 -*-
 
+import datetime
+import uuid
+from functools import wraps
+
+import jwt
+from apispec import APISpec
+from apispec.ext.marshmallow import MarshmallowPlugin
+from flask import Flask
+from flask import jsonify, request, make_response
+from flask_apispec import marshal_with, doc, use_kwargs
+from flask_apispec.extension import FlaskApiSpec
+from flask_mail import Mail, Message
+from flask_restful import Api
+from marshmallow import fields
+from werkzeug.security import check_password_hash, generate_password_hash
+
 import product_repository
 import user_repository
-import jwt
-import uuid
-import datetime
-
-from flask import Flask, jsonify, request, make_response
-from model.product import ProductSchema, Product
+from model.product import ProductSchema, Product, EmptySchema
 from model.user import UserSchema, User
-from functools import wraps
-from werkzeug.security import check_password_hash
-from werkzeug.security import generate_password_hash
-from flask_mail import Mail, Message
 
-
-app = Flask(__name__)
+app = Flask(__name__)  # Flask app instance initiated
+api = Api(app)  # Flask restful wraps Flask app around it.
 app.config['SECRET_KEY'] = 'zaq1ZAQ2'
 mail = Mail(app)
+app.config.update({
+    'APISPEC_SPEC': APISpec(
+        title='Catalog Restful Api',
+        version='v1',
+        plugins=[MarshmallowPlugin()],
+        openapi_version='2.0.0'
+    ),
+    'APISPEC_SWAGGER_URL': '/swagger/',  # URI to access API Doc JSON
+    'APISPEC_SWAGGER_UI_URL': '/swagger-ui/'  # URI to access UI of API Doc
+})
+docs = FlaskApiSpec(app)
 
 
 def token_required(f):
@@ -38,15 +56,34 @@ def token_required(f):
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
             # print("Id User {}".format(data['public_id']))
             current_user = user_repository.get_user_by_id(data['public_id'])
+            print(current_user)
         except Exception as e:
             print("Error in decorator {}".format(e.__str__()))
             return jsonify({'message': 'token is invalid'})
         return f(current_user, *args, **kwargs)
+
     return decorator
 
 
-@app.route('/products')
-def get_products():
+@app.after_request
+def after_request(response):
+    """
+     Enable CORS. Disable it if you don't need CORS
+    :param response:
+    :return:
+    """
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, PUT, DELETE"
+    response.headers[
+        "Access-Control-Allow-Headers"] = "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization"
+    return response
+
+
+@app.route('/products', methods=['GET'])
+@doc(description='GET Product API.', tags=['Product'])
+@marshal_with(ProductSchema)
+def get_product():
     """
      Get all products
     :return: json all products
@@ -57,10 +94,12 @@ def get_products():
     all_product = schema.dump(products)
     return jsonify(all_product)
 
-
 @app.route('/products', methods=['POST'])
 @token_required
-def add_product(current_user):
+@doc(description='POST Product API.', tags=['Product'])
+#@use_kwargs(ProductSchema, location=('json'))
+@marshal_with(EmptySchema, code=200)
+def post_product(current_user):
     """
      Add new product
     :param current_user: current user from jwt
@@ -68,7 +107,8 @@ def add_product(current_user):
     """
     if current_user is not None and current_user.role == 'Admin':
         product = ProductSchema().load(request.get_json())
-        new_product = Product(product['sku'], product['name'], product['price'], product['brand'], product['created'])
+        new_product = Product(product['sku'], product['name'], product['price'], product['brand'],
+                              product['created'])
         result = product_repository.add_product(new_product)
         if result:
             return "Product add OK", 200
@@ -80,22 +120,26 @@ def add_product(current_user):
 
 @app.route("/products", methods=["PUT"])
 @token_required
-def update_product(current_user):
+@doc(description='PUT Product API.', tags=['Product'])
+#@use_kwargs(ProductSchema, location=('json'))
+@marshal_with(EmptySchema, code=200)
+def put_product(current_user):
     """
-     Update product
-     :param current_user: current user from jwt
+    Update product
+    :param current_user: current user from jwt
     :return: api result
     """
     if current_user is not None and current_user.role == 'Admin':
         product = ProductSchema().load(request.get_json())
-        update_product = Product(product['sku'], product['name'], product['price'], product['brand'], product['created'])
+        update_product = Product(product['sku'], product['name'], product['price'], product['brand'],
+                                 product['created'])
         result = product_repository.update_product(update_product)
         if result:
             print("Update product {}".format(result))
             # send email to others Admin
             users = user_repository.get_all_user()
             with mail.connect() as conn:
-               # print("Count user {}".format(users.__len__()))
+                # print("Count user {}".format(users.__len__()))
                 for user in users:
                     # print("Id {} current {} role {}".format(user.id, current_user.id, user.role))
                     if user.id != current_user.id and user.role == 'Admin':
@@ -103,11 +147,11 @@ def update_product(current_user):
                         message = "Hello {} the product {} changed".format(user.name, update_product.sku)
                         subject = "Product change"
                         msg = Message(recipients=[user.email],
-                                      sender= current_user.email,
+                                      sender=current_user.email,
                                       body=message,
                                       subject=subject)
                         conn.send(msg)
-                       # print('Send {}'.format(message))
+                    # print('Send {}'.format(message))
             return "Product update OK", 200
         else:
             return "Error update product", 400
@@ -117,6 +161,9 @@ def update_product(current_user):
 
 @app.route('/products/<sku>', methods=['DELETE'])
 @token_required
+@doc(description='DELETE Product API.', tags=['Product'])
+@use_kwargs({'sku': fields.Str()})
+@marshal_with(EmptySchema, code=200)
 def delete_product(current_user, sku):
     """
      Delete product
@@ -135,27 +182,10 @@ def delete_product(current_user, sku):
         return "Unauthorized user ", 401
 
 
-@app.route('/login', methods=['GET', 'POST'])
-def login_user():
-    """
-    Login user in api
-    :return: token
-    """
-    auth = request.authorization
-    if not auth or not auth.username or not auth.password:
-        return make_response('could not verify', 401, {'WWW.Authentication': 'Basic realm: "login required"'})
-    users_db = user_repository.get_all_user()
-    user = next((s for s in users_db if s.email == auth.username), None)
-    if user is not None and check_password_hash(user.password, auth.password):
-        token = jwt.encode(
-            {'public_id': user.id, 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=60)},
-            app.config['SECRET_KEY'])
-        return jsonify({'token': token})
-    return make_response('could not verify', 401, {'WWW.Authentication': 'Basic realm: "login required"'})
-
-
-@app.route('/user')
+@app.route('/user', methods=['GET'])
 @token_required
+@doc(description='GET User API.', tags=['User'])
+@marshal_with(UserSchema(many=True))
 def get_user(current_user):
     """
     Get all user
@@ -169,10 +199,12 @@ def get_user(current_user):
         return jsonify(all_user)
     return "Unauthorized user ", 401
 
-
 @app.route('/user', methods=['POST'])
 @token_required
-def add_user(current_user):
+@doc(description='POST User API.', tags=['User'])
+#@use_kwargs(UserSchema, location=('json'))
+@marshal_with(EmptySchema, code=200)
+def post_user(current_user):
     """
     Add new user
     :param current_user: current user from jwt
@@ -193,10 +225,12 @@ def add_user(current_user):
     else:
         return "Unauthorized user ", 401
 
-
 @app.route("/user", methods=["PUT"])
 @token_required
-def update_user(current_user):
+@doc(description='PUT User API.', tags=['User'])
+#@use_kwargs(UserSchema, location=('json'))
+@marshal_with(EmptySchema, code=200)
+def put_user(current_user):
     """
      Update user
     :param current_user: current user from jwt
@@ -214,9 +248,11 @@ def update_user(current_user):
     else:
         return "Unauthorized user ", 401
 
-
 @app.route('/user/<id>', methods=['DELETE'])
 @token_required
+@doc(description='DELETE User API.', tags=['User'])
+@use_kwargs({'id': fields.Str()})
+@marshal_with(EmptySchema, code=200)
 def delete_user(current_user, id):
     """
      Delete user by id
@@ -235,18 +271,36 @@ def delete_user(current_user, id):
         return "Unauthorized user ", 401
 
 
-@app.after_request
-def after_request(response):
+@app.route('/login', methods=['GET', 'POST'])
+@doc(description='GET User API.', tags=['Login'])
+@marshal_with(EmptySchema, code=200)
+def login_user():
     """
-     Enable CORS. Disable it if you don't need CORS
-    :param response:
-    :return:
+    Login user in api
+    :return: token
     """
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, PUT, DELETE"
-    response.headers["Access-Control-Allow-Headers"] = "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization"
-    return response
+    auth = request.authorization
+    if not auth or not auth.username or not auth.password:
+        return make_response('could not verify', 401, {'WWW.Authentication': 'Basic realm: "login required"'})
+    users_db = user_repository.get_all_user()
+    user = next((s for s in users_db if s.email == auth.username), None)
+    if user is not None and check_password_hash(user.password, auth.password):
+        token = jwt.encode(
+            {'public_id': user.id, 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=60)},
+            app.config['SECRET_KEY'])
+        return jsonify({'token': token})
+    return make_response('could not verify', 401, {'WWW.Authentication': 'Basic realm: "login required"'})
 
-if __name__ == "__main__":
-    app.run()
+docs.register(get_product)
+docs.register(post_product)
+docs.register(put_product)
+docs.register(delete_product)
+
+docs.register(get_user)
+docs.register(post_user)
+docs.register(put_user)
+docs.register(delete_user)
+docs.register(login_user)
+
+if __name__ == '__main__':
+    app.run(debug=True)
