@@ -37,7 +37,7 @@ def test_add_user():
         if login.status_code == 200:
             token = login.json()['token']
             print(token)
-            new_user = User(uuid.uuid4().__str__(), "admin2", "admin2Api@gmail.com", '1qazxsw2', 'Admin',
+            new_user = User("", "admin2", "admin2Api@gmail.com", '1qazxsw2', 'Admin',
                               datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'), '')
             json_string = new_user.to_json()
             headers = {'Content-type': 'application/json', 'Accept': 'text/plain', 'x-access-tokens': token }

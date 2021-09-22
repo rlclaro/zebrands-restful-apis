@@ -52,10 +52,10 @@ class UserSchema(Schema):
     """
      User Schema
     """
-    id = fields.String()
-    name = fields.String()
-    email = fields.String()
-    password = fields.String()
-    role = fields.String()
-    created = fields.String()
-    idcreated = fields.String()
+    id = fields.String(required=False, description="user id")
+    name = fields.String(required=True, description="user name")
+    email = fields.String(required=True, description="user name")
+    password = fields.String(required=True, description="user password")
+    role = fields.String(required=True, description="user role")
+    created = fields.String(required=False, description="user created date")
+    idcreated = fields.String(required=False, description="user idcreated user")
