@@ -15,6 +15,8 @@ pipenv install
 
 # send emails use https://pythonhosted.org/Flask-Mail/
 
+# view docs http://127.0.0.1:5000/swagger-ui/
+
 
 ```
 
