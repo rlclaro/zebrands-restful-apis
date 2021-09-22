@@ -10,7 +10,7 @@ def get_db():
     Get conecct to db catalog
     :return:
     """
-    conn = sqlite3.connect("catalog.db")
+    conn = sqlite3.connect("../catalog.db")
     return conn
 
 

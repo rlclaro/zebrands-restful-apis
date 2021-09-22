@@ -37,11 +37,16 @@ def test_add_user():
         if login.status_code == 200:
             token = login.json()['token']
             print(token)
-            new_user = User("", "admin2", "admin2Api@gmail.com", '1qazxsw2', 'Admin',
+            new_user = User("", "admin3", "admin3Api@gmail.com", '1qazxsw2', 'Admin',
                               datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'), '')
-            json_string = new_user.to_json()
+            json_string = {
+                "name": new_user.name,
+                "email": new_user.email,
+                "password": new_user.password,
+                "role": new_user.role
+            }
             headers = {'Content-type': 'application/json', 'Accept': 'text/plain', 'x-access-tokens': token }
-            response = requests.post('http://127.0.0.1:5000/user', data=json_string, headers=headers)
+            response = requests.post('http://127.0.0.1:5000/user', data=json.dumps(json_string), headers=headers)
             assert response.status_code == 200
     except Exception as e:
         print(e)

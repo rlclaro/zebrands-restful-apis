@@ -15,6 +15,7 @@ PyJWT= "1.6.4"
 Flask-Mail = '*'
 flask-restful = '*'
 flask-apispec = '*'
+Flask-SQLAlchemy = '*'
 
 [dev-packages]
 
