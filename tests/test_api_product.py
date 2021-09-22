@@ -34,14 +34,17 @@ def test_add_product():
             print(token)
             data = Product(uuid.uuid4().__str__(), 'Silla', 50, 'Luuna',
                            datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'))
-            json_string = data.to_json()
-
+            json_string = {
+                "name": data.name,
+                "price": data.price,
+                "brand": data.brand
+            }
             date_str = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S').__str__()
             date_format = datetime.datetime.strptime(date_str, '%Y-%m-%dT%H:%M:%S')
             print(date_format)
 
             headers = {'Content-type': 'application/json', 'Accept': 'text/plain', 'x-access-tokens': token}
-            response = requests.post('http://127.0.0.1:5000/products', data=json_string, headers=headers)
+            response = requests.post('http://127.0.0.1:5000/products', data=json.dumps(json_string), headers=headers)
             assert response.status_code == 200
     except Exception as e:
         print(e)

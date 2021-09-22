@@ -6,6 +6,7 @@ from marshmallow import Schema, fields
 
 
 class Product(object):
+    __tablename__ = 'product'
     """
      Entity product
     """
@@ -51,11 +52,20 @@ class ProductSchema(Schema):
     """
     Product Schema
     """
-    sku = fields.String(required=False, description="product sku")
+    sku = fields.String(required=True, description="product sku")
     name = fields.String(required=True, description="product name")
     price = fields.Integer(required=True, description="product price")
     brand = fields.String(required=True, description="product brand")
     created = fields.String(required=True, description="product created")
+
+
+class AddProductSchema(Schema):
+    """
+     Add product Schema
+    """
+    name = fields.String(required=True, description="product name")
+    price = fields.Integer(required=True, description="product price")
+    brand = fields.String(required=True, description="product brand")
 
 
 class EmptySchema(Schema):

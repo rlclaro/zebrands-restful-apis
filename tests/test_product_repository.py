@@ -3,7 +3,7 @@
 import uuid
 import datetime
 
-from product_repository import create_table, add_product, get_all_product, delete_product
+from repository.product_db import create_table, add_product, get_all_product, delete_product
 from catalog.model.product import Product
 
 def test_create_table():
