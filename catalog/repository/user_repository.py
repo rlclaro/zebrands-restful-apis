@@ -28,6 +28,14 @@ class UserRepository(object):
         """
         return self.session.query(User).filter_by(id=id).first()
 
+    def get_by_email(self, email):
+        """
+         Get user by email
+        :param id: User email
+        :return: one User
+        """
+        return self.session.query(User).filter_by(email=email).first()
+
     def get_all(self):
         """
         Get all User

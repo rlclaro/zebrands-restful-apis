@@ -2,9 +2,16 @@
 
 import datetime
 import uuid
-from functools import wraps
-
 import jwt
+
+from ariadne import load_schema_from_path, make_executable_schema, \
+    graphql_sync, snake_case_fallback_resolvers, ObjectType
+from ariadne.constants import PLAYGROUND_HTML
+from graphql_operations.queries import listProducts_resolver, getProduct_resolver, getUser_resolver, listUsers_resolver
+from graphql_operations.mutations import delete_product_resolver, login_resolver, IsAuthorizedDirective, \
+    IsAuthenticatedDirective, add_product_resolver, update_product_resolver, add_user_resolver, update_user_resolver, \
+    delete_user_resolver
+from functools import wraps
 from apispec import APISpec
 from apispec.ext.marshmallow import MarshmallowPlugin
 from flask import Flask
@@ -72,6 +79,76 @@ def token_required(f):
         return f(current_user, *args, **kwargs)
 
     return decorator
+
+
+query = ObjectType("Query")
+mutation = ObjectType("Mutation")
+
+query.set_field("listProducts", listProducts_resolver)
+query.set_field("getProduct", getProduct_resolver)
+query.set_field("listUsers", listUsers_resolver)
+query.set_field("getUser", getUser_resolver)
+
+mutation.set_field("login", login_resolver)
+mutation.set_field("addProduct", add_product_resolver)
+mutation.set_field("deleteProduct", delete_product_resolver)
+mutation.set_field("updateProduct", update_product_resolver)
+mutation.set_field("addUser", add_user_resolver)
+mutation.set_field("updateUser", update_user_resolver)
+mutation.set_field("deleteUser", delete_user_resolver)
+
+type_defs = load_schema_from_path("schema.graphql")
+schema = make_executable_schema(
+    type_defs, query, mutation, snake_case_fallback_resolvers,
+    directives={"isAuthorized": IsAuthorizedDirective, "isAuthenticated": IsAuthenticatedDirective}
+)
+
+
+@app.route('/')
+def index():
+    return 'Catalog API !!'
+
+
+def get_user_context(request):
+    """
+     Get user context from request graphql
+    :param request: request
+    :return: dict context
+    """
+    context = {'request': request, 'user': None}
+    if "Authorization" in request.headers:
+        auth = request.headers["Authorization"]
+        try:
+            data = jwt.decode(auth, app.config['SECRET_KEY'], algorithms=["HS256"])
+            session = Session()
+            repository = UserRepository(session)
+            current_user = repository.get_by_id(data['public_id'])
+            # print(current_user)
+            if current_user is None:
+                return context
+            else:
+                context['user'] = current_user
+        except jwt.PyJWTError:
+            return context
+    return context
+
+
+@app.route("/graphql", methods=["GET"])
+def graphql_playground():
+    return PLAYGROUND_HTML, 200
+
+
+@app.route("/graphql", methods=["POST"])
+def graphql_server():
+    data = request.get_json()
+    success, result = graphql_sync(
+        schema,
+        data,
+        context_value=get_user_context(request),
+        debug=app.debug
+    )
+    status_code = 200 if success else 400
+    return jsonify(result), status_code
 
 
 @app.after_request

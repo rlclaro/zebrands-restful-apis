@@ -19,6 +19,7 @@ class ProductRepository(object):
         """
         self.session.add(entity)
         self.session.commit()
+        #self.session.expunge_all()
         return True
 
     def get_by_sku(self, sku):
