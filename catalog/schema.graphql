@@ -1,0 +1,77 @@
+schema {
+    query: Query
+    mutation: Mutation
+}
+
+directive @isAuthorized(roles: [Role]) on FIELD_DEFINITION
+directive @isAuthenticated on FIELD_DEFINITION
+
+enum Role {
+    Admin
+    Anonymous
+}
+
+type Product {
+    sku: String
+    name: String!
+    price: Int!
+    brand: String!
+    created: String
+}
+
+type User{
+    id: String!
+    email: String!
+    name: String!
+    password: String!
+    role: String!
+    idcreated: String!
+}
+
+type ProductResult {
+    success: Boolean!
+    errors: [String]
+    product: Product
+}
+
+type UserResult{
+    success: Boolean!
+    errors: [String]
+    user: User
+}
+
+type ProductsResult {
+    success: Boolean!
+    errors: [String]
+    product: [Product]
+}
+
+type UsersResult{
+    success: Boolean!
+    errors: [String]
+    user: [User]
+}
+
+type LoginResult {
+    token: String!
+    success: Boolean!
+    errors: [String]
+}
+
+type Query {
+    listProducts: ProductsResult!
+    listUsers: UsersResult @isAuthorized(roles: [Admin])
+    getProduct(sku: String!): ProductResult!
+    getUser(username: String!): UserResult! @isAuthenticated
+}
+
+type Mutation {
+    login(username: String! password: String!): LoginResult
+    addProduct(name: String!, price: Int!, brand: String!): ProductResult! @isAuthorized(roles: [Admin])
+    updateProduct(sku: String!, name: String!, price: Int!, brand: String!): ProductResult! @isAuthorized(roles: [Admin])
+    deleteProduct(sku: String!): ProductResult! @isAuthorized(roles: [Admin])
+
+    addUser(email:String!, name: String!, password: String!, role: String!): UserResult! @isAuthorized(roles: [Admin])
+    updateUser(id:String!, name: String!, password: String!, role: String!): UserResult! @isAuthorized(roles: [Admin])
+    deleteUser(id: String!): UserResult! @isAuthorized(roles: [Admin])
+}
