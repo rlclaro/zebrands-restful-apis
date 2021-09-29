@@ -19,6 +19,7 @@ class ProductRepository(object):
         """
         self.session.add(entity)
         self.session.commit()
+        #self.session.expunge_all()
         return True
 
     def get_by_sku(self, sku):
@@ -28,6 +29,14 @@ class ProductRepository(object):
         :return: one product
         """
         return self.session.query(Product).filter_by(sku=sku).first()
+
+    def get_by_name(self, name):
+        """
+         Get product by name
+        :param sku: product name
+        :return: list product
+        """
+        return self.session.query(Product).filter_by(name=name).all()
 
     def get_all(self):
         """

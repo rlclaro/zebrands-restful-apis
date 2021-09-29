@@ -2,7 +2,7 @@
 
 import datetime
 import json
-import uuid
+
 import requests
 
 from catalog.model.user import User, UserSchema

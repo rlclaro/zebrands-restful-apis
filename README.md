@@ -17,6 +17,166 @@ pipenv install
 
 # view docs http://127.0.0.1:5000/swagger-ui/
 
+# for test api use test_api_product.py and test_api_user.py
 
-```
+# view graphql http://127.0.0.1:5000/graphql
 
+# using https://ariadnegraphql.org/
+
+# example mutation
+
+mutation{
+  login(username: "adminApi@gmail.com", password:"zaq1ZAQ!")
+  {
+    token
+    success
+    errors
+  }
+}
+
+# Product crud
+
+query{
+   listProducts
+  {
+    success
+    errors
+    product
+    {
+      sku
+      name
+      price
+      brand
+      created
+    }
+  }
+}
+
+# In mutation HTTP HEADERS add token from mutation login to authorized
+
+{"Authorization":""}
+
+mutation
+{
+   addProduct(name:"Lavadora", price: 1000, brand: "Ocean")
+  {
+    success
+    errors
+    product
+    {
+      sku
+      name
+      price
+      brand
+      created
+    }
+  }
+}
+
+mutation
+{
+  deleteProduct(sku:"911438b5-a463-457e-b794-fbc1940813b5")
+  {
+    success
+    errors
+    product
+    {
+      sku
+      name
+      price
+      brand
+      created
+    }
+  }
+}
+
+mutation
+{
+   updateProduct(sku:"911438b5-a463-457e-b794-fbc1940813b5", name:"Almohadas", price: 400, brand:"Luuna")
+  {
+    success
+    errors
+    product
+    {
+      sku
+      name
+      price
+      brand
+      created
+    }
+  }
+}
+
+# User crud
+query
+{
+    listUsers 
+  {
+    success
+    errors
+    user
+    {
+      id
+      email
+      name
+      password
+      role
+      idcreated
+    }
+  }
+}
+
+mutation
+{
+   addUser(email:"admin5Api@gmail.com", name:"admin5", password:"zaq1ZAQ!", role:"Admin")
+  {
+    success
+    errors
+    user
+    {
+      id
+      email
+      name
+      password
+      role
+      idcreated
+    }
+  }
+}
+
+mutation
+{
+   updateUser(id:"ac9eeb52-63b7-413b-a310-de393998ca71", name:"Admin5", password:"1qazxsw2", role:"Admin")
+  {
+    success
+    errors
+    user
+    {
+      id
+      email
+      name
+      password
+      role
+      idcreated
+    }
+  }
+}
+
+
+mutation
+{
+   deleteUser(id:"ac9eeb52-63b7-413b-a310-de393998ca71")
+  {
+    success
+    errors
+    user
+    {
+      id
+      email
+      name
+      password
+      role
+      idcreated
+    }
+  }
+}

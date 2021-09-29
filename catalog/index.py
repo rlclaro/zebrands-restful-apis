@@ -2,9 +2,16 @@
 
 import datetime
 import uuid
-from functools import wraps
-
 import jwt
+
+from ariadne import load_schema_from_path, make_executable_schema, \
+    graphql_sync, snake_case_fallback_resolvers, ObjectType
+from ariadne.constants import PLAYGROUND_HTML
+from graphql_operations.queries import listProducts_resolver, getProduct_resolver, getUser_resolver, listUsers_resolver
+from graphql_operations.mutations import delete_product_resolver, login_resolver, IsAuthorizedDirective, \
+    IsAuthenticatedDirective, add_product_resolver, update_product_resolver, add_user_resolver, update_user_resolver, \
+    delete_user_resolver
+from functools import wraps
 from apispec import APISpec
 from apispec.ext.marshmallow import MarshmallowPlugin
 from flask import Flask
@@ -56,6 +63,8 @@ def token_required(f):
         token = None
         if 'x-access-tokens' in request.headers:
             token = request.headers['x-access-tokens']
+        if 'X-Access-Token' in request.headers:
+            token = request.headers['X-Access-Token']
         if not token:
             return jsonify({'message': 'a valid token is missing'})
         try:
@@ -74,19 +83,95 @@ def token_required(f):
     return decorator
 
 
+query = ObjectType("Query")
+mutation = ObjectType("Mutation")
+
+query.set_field("listProducts", listProducts_resolver)
+query.set_field("getProduct", getProduct_resolver)
+query.set_field("listUsers", listUsers_resolver)
+query.set_field("getUser", getUser_resolver)
+
+mutation.set_field("login", login_resolver)
+mutation.set_field("addProduct", add_product_resolver)
+mutation.set_field("deleteProduct", delete_product_resolver)
+mutation.set_field("updateProduct", update_product_resolver)
+mutation.set_field("addUser", add_user_resolver)
+mutation.set_field("updateUser", update_user_resolver)
+mutation.set_field("deleteUser", delete_user_resolver)
+
+type_defs = load_schema_from_path("schema.graphql")
+schema = make_executable_schema(
+    type_defs, query, mutation, snake_case_fallback_resolvers,
+    directives={"isAuthorized": IsAuthorizedDirective, "isAuthenticated": IsAuthenticatedDirective}
+)
+
+
+@app.route('/')
+def index():
+    return 'Catalog API !!'
+
+
+def get_user_context(request):
+    """
+     Get user context from request graphql
+    :param request: request
+    :return: dict context
+    """
+    context = {'request': request, 'user': None}
+    if "Authorization" in request.headers:
+        auth = request.headers["Authorization"]
+        try:
+            data = jwt.decode(auth, app.config['SECRET_KEY'], algorithms=["HS256"])
+            session = Session()
+            repository = UserRepository(session)
+            current_user = repository.get_by_id(data['public_id'])
+            # print(current_user)
+            if current_user is None:
+                return context
+            else:
+                context['user'] = current_user
+        except jwt.PyJWTError:
+            return context
+    return context
+
+
+@app.route("/graphql", methods=["GET"])
+def graphql_playground():
+    return PLAYGROUND_HTML, 200
+
+
+@app.route("/graphql", methods=["POST"])
+def graphql_server():
+    data = request.get_json()
+    success, result = graphql_sync(
+        schema,
+        data,
+        context_value=get_user_context(request),
+        debug=app.debug
+    )
+    status_code = 200 if success else 400
+    return jsonify(result), status_code
+
+
+### CORS section
 @app.after_request
-def after_request(response):
-    """
-     Enable CORS. Disable it if you don't need CORS
-    :param response:
-    :return:
-    """
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, PUT, DELETE"
-    response.headers[
-        "Access-Control-Allow-Headers"] = "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization"
+def after_request_func(response):
+    origin = request.headers.get('Origin')
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        response.headers.add('Access-Control-Allow-Headers', '*')       
+        response.headers.add('Access-Control-Allow-Methods',
+                            'GET, POST, OPTIONS, PUT, PATCH, DELETE')
+        if origin:
+            response.headers.add('Access-Control-Allow-Origin', origin)
+    else:
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        if origin:
+            response.headers.add('Access-Control-Allow-Origin', origin)
+
     return response
+    ### end CORS section
 
 
 @app.route('/products', methods=['GET'])
@@ -104,6 +189,44 @@ def get_product():
     print("Count all products {}".format(products.__len__()))
     all_product = schema.dump(products)
     return jsonify(all_product)
+
+@app.route('/products/sku/<sku>', methods=['GET'])
+@doc(description='GET Product API.', tags=['Product'])
+@token_required
+@use_kwargs({'sku': fields.Str()})
+@marshal_with(ProductSchema)
+def get_product_by_sku(current_user, sku):
+    """
+     Get all products
+    :return: json all products
+    """
+    session = Session()
+    repository = ProductRepository(session)
+    product = repository.get_by_sku(sku)
+    schema = ProductSchema(many=False)
+    result_product = schema.dump(product)
+    return jsonify(result_product)
+
+
+@app.route('/products/name/<name>', methods=['GET'])
+@doc(description='GET Product API.', tags=['Product'])
+@token_required
+@use_kwargs({'name': fields.Str()})
+@marshal_with(ProductSchema)
+def get_product_by_name(current_user, name):
+    """
+     Get all products
+    :return: json all products
+    """
+    print('get_product_by_name {}'.format(name))
+    session = Session()
+    repository = ProductRepository(session)
+    product = repository.get_by_name(name)
+    print("Count all products {}".format(product.__len__()))
+    schema = ProductSchema(many=True)
+    result_product = schema.dump(product)
+    return jsonify(result_product)
+
 
 @app.route('/products', methods=['POST'])
 @token_required
@@ -219,7 +342,7 @@ def get_user(current_user):
         print("Count all users {}".format(users.__len__()))
         all_user = schema.dump(users)
         return jsonify(all_user)
-    return "Unauthorized user ", 401
+    return "Unauthorized user", 401
 
 @app.route('/user', methods=['POST'])
 @token_required
@@ -307,9 +430,12 @@ def login_user():
     Login user in api
     :return: token
     """
+    print('Login')
     auth = request.authorization
+    # print(request.authorization)
     if not auth or not auth.username or not auth.password:
         return make_response('could not verify', 401, {'WWW.Authentication': 'Basic realm: "login required"'})
+    # print(auth.username)
     session = Session()
     repository = UserRepository(session)
     users_db = repository.get_all()
@@ -318,13 +444,15 @@ def login_user():
         token = jwt.encode(
             {'public_id': user.id, 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=60)},
             app.config['SECRET_KEY'])
-        return jsonify({'token': token})
+        return jsonify({'token': token, 'user': user.to_json()})
     return make_response('could not verify', 401, {'WWW.Authentication': 'Basic realm: "login required"'})
 
 docs.register(get_product)
 docs.register(post_product)
 docs.register(put_product)
 docs.register(delete_product)
+docs.register(get_product_by_sku)
+docs.register(get_product_by_name)
 
 docs.register(get_user)
 docs.register(post_user)
