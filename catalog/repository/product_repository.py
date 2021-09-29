@@ -30,6 +30,14 @@ class ProductRepository(object):
         """
         return self.session.query(Product).filter_by(sku=sku).first()
 
+    def get_by_name(self, name):
+        """
+         Get product by name
+        :param sku: product name
+        :return: list product
+        """
+        return self.session.query(Product).filter_by(name=name).all()
+
     def get_all(self):
         """
         Get all product
