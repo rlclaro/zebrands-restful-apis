@@ -344,6 +344,29 @@ def get_user(current_user):
         return jsonify(all_user)
     return "Unauthorized user", 401
 
+@app.route('/user/id/<id>', methods=['GET'])
+@doc(description='GET User API.', tags=['User'])
+@token_required
+@use_kwargs({'id': fields.Str()})
+@marshal_with(UserSchema)
+def get_user_by_id(current_user, id):
+    """
+    Get user by id
+    :param current_user: current_user
+    :param id: id user
+    :return:
+    """
+    if current_user is not None and current_user.role == 'Admin':
+        session = Session()
+        repository = UserRepository(session)
+        user = repository.get_by_id(id)
+        schema = UserSchema(many=False)
+        result_user = schema.dump(user)
+        return jsonify(result_user)
+    else:
+        return "Unauthorized user ", 401
+
+
 @app.route('/user', methods=['POST'])
 @token_required
 @doc(description='POST User API.', tags=['User'])
