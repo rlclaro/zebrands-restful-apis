@@ -17,6 +17,7 @@ To install this app in your local machine please follow the instructions bellow.
 1. Create a new network with `docker network create localnet`
 3. Run `docker-compose up` command.
 
+# https://towardsdatascience.com/how-to-dockerize-an-existing-flask-application-115408463e1c
 
 # use https://github.com/pypa/pipenv
 
