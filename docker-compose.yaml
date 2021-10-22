@@ -1,0 +1,16 @@
+version: '3.5'
+
+services:
+  app:
+    build: .
+    command: python catalog/index.py
+    volumes:
+      - .:/python-flask
+    ports:
+      - "5000:5000"
+    networks:
+      - localnet
+   
+networks:
+  localnet:
+    external: true
