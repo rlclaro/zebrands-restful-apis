@@ -5,11 +5,18 @@
 
 To run this application, you will need Python 3.8 and [Pipenv](https://pipenv.readthedocs.io/en/latest/) installed locally. If you have then, you can issue the following commands:
 
-```bash
-# from the flask-restful-apis directory
-pipenv install
-./bootstrap.sh 
-```
+1. virtualenv venv
+2. pip install -r requirements.txt
+3. python catalog/index.py  
+
+
+## Docker-compose instructions
+
+To install this app in your local machine please follow the instructions bellow.
+
+1. Create a new network with `docker network create localnet`
+3. Run `docker-compose up` command.
+
 
 # use https://github.com/pypa/pipenv
 

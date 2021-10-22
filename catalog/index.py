@@ -99,7 +99,7 @@ mutation.set_field("addUser", add_user_resolver)
 mutation.set_field("updateUser", update_user_resolver)
 mutation.set_field("deleteUser", delete_user_resolver)
 
-type_defs = load_schema_from_path("schema.graphql")
+type_defs = load_schema_from_path("catalog/schema.graphql")
 schema = make_executable_schema(
     type_defs, query, mutation, snake_case_fallback_resolvers,
     directives={"isAuthorized": IsAuthorizedDirective, "isAuthenticated": IsAuthenticatedDirective}
@@ -484,4 +484,4 @@ docs.register(delete_user)
 docs.register(login_user)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host="0.0.0.0", debug=True)
